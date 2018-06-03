@@ -1,7 +1,8 @@
-(ns holdfast.actors4
+(ns holdfast.actors5
   (:require [clojure.test :refer :all]
             [clojure.spec.alpha :as s]
-            [clojure.spec.test.alpha :as stest]))
+            [clojure.spec.test.alpha :as stest]
+            [clojure.spec.gen.alpha :as gen]))
 
 (def NAME_LENGTH_LIMIT 85)
 (def NPC-NAMES #{"Eliza" "Evelyn" "Ravian" "Sedrik" "Coro"})
@@ -22,7 +23,9 @@
               (and (contains? #{:player :flies} type) (string? name)))]}
    (assoc (->Actor name type max-hp hp job) :age age)))
 
-(s/def ::name (s/and string? #(< (count(:name %)) NAME_LENGTH_LIMIT)))
+(s/def ::name (s/with-gen
+                (s/and string? #(< (count(:name %)) NAME_LENGTH_LIMIT))
+                #(s/gen #{"Eliza" "Evelyn" "Ravian" "Sedrik" "Coro"})))
 (s/def ::type #{:player :flies :npc})
 (s/def ::age (s/or :age-supplied int? :no-age nil?))
 (s/def ::max-hp (s/and int? #(> % 0)))
@@ -63,10 +66,18 @@
       (is (true? (is-alive? cloud)))))
   (testing "is alive... nope"
     (let [cloud (->Actor "cloud" :player 25 -1 :pilgrim)]
-    (is (false? (is-alive? cloud))))))
+      (is (false? (is-alive? cloud))))))
 
 (deftest actor-spec
   (testing "hp can't be negative"
     (is (thrown? Exception (->Actor "witcher" :player -1 25 :nurse)))))
+
+(for [a (gen/sample
+          (s/gen ::actor))]
+  (do (print a)
+      (print ":  ")
+      (print (is-alive?(apply actor a)))
+      (prn)))
+
 
 (stest/instrument [`->Actor `actor])
